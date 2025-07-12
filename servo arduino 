@@ -3,48 +3,48 @@
 Servo servo1;
 Servo servo2;
 
-const int button1Pin = 2;
-const int button2Pin = 3;
-const int button3Pin = 4;
-
-int button1State = 0;
-int button2State = 0;
-int button3State = 0;
+const int button1Pin = 2; // Right button
+const int button2Pin = 3; // Left button
+const int button3Pin = 4; // Both button
 
 void setup() {
-  servo1.attach(9);
-  servo2.attach(10);
+  servo1.attach(9);  // Signal pin of servo1
+  servo2.attach(10); // Signal pin of servo2
 
   pinMode(button1Pin, INPUT_PULLUP);
   pinMode(button2Pin, INPUT_PULLUP);
   pinMode(button3Pin, INPUT_PULLUP);
 
-  servo1.write(90); // Neutral position
-  servo2.write(90);
+  // Initial stop
+  servo1.write(90); 
+  servo2.write(90); 
 }
 
 void loop() {
-  button1State = digitalRead(button1Pin);
-  button2State = digitalRead(button2Pin);
-  button3State = digitalRead(button3Pin);
+  bool b1 = digitalRead(button1Pin) == LOW; // Button pressed logic
+  bool b2 = digitalRead(button2Pin) == LOW;
+  bool b3 = digitalRead(button3Pin) == LOW;
 
-  if (button1State == LOW) {
-    servo1.write(0); // move servo1 to right
-    delay(500);
-    servo1.write(90); // back to center
+  if (b3) {
+    // Button 3: Both rotate
+    servo1.write(120); // Clockwise
+    servo2.write(60);  // Counterclockwise
   }
-
-  if (button2State == LOW) {
-    servo2.write(180); // move servo2 to left
-    delay(500);
-    servo2.write(90); // back to center
+  else if (b1) {
+    // Button 1: Servo 1 clockwise, Servo 2 stop
+    servo1.write(120); // Clockwise
+    servo2.write(90);  // Stop
   }
-
-  if (button3State == LOW) {
-    servo1.write(45);
-    servo2.write(135);
-    delay(500);
+  else if (b2) {
+    // Button 2: Servo 1 stop, Servo 2 counterclockwise
+    servo1.write(90);  // Stop
+    servo2.write(60);  // Counterclockwise
+  }
+  else {
+    // No button pressed: stop both
     servo1.write(90);
     servo2.write(90);
   }
+
+  delay(20); // short delay to stabilize
 }
