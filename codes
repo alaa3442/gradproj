@@ -1,0 +1,59 @@
+#include <Servo.h>
+
+// السيرفو
+Servo servoLeft;
+Servo servoRight;
+
+// الحساسات الرقمية
+const int irLeftPin = 2;
+const int irRightPin = 3;
+
+void setup() {
+  servoLeft.attach(9);
+  servoRight.attach(10);
+
+  pinMode(irLeftPin, INPUT);
+  pinMode(irRightPin, INPUT);
+
+  Serial.begin(9600);
+}
+
+void loop() {
+  int irLeft = digitalRead(irLeftPin);
+  int irRight = digitalRead(irRightPin);
+
+  Serial.print("Left: "); Serial.print(irLeft);
+  Serial.print(" | Right: "); Serial.println(irRight);
+
+  if (irLeft == LOW && irRight == LOW) {
+    moveForward();
+  } else if (irLeft == LOW && irRight == HIGH) {
+    turnLeft();
+  } else if (irLeft == HIGH && irRight == LOW) {
+    turnRight();
+  } else {
+    stopMoving();
+  }
+
+  delay(50);
+}
+
+void moveForward() {
+  servoLeft.write(0);     // تحرك للأمام
+  servoRight.write(180);
+}
+
+void turnLeft() {
+  servoLeft.write(90);    // توقف اليسار
+  servoRight.write(180);  // اليمين يتحرك
+}
+
+void turnRight() {
+  servoLeft.write(0);     // اليسار يتحرك
+  servoRight.write(90);   // توقف اليمين
+}
+
+void stopMoving() {
+  servoLeft.write(90);
+  servoRight.write(90);
+}
