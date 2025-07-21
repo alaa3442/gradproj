@@ -27,9 +27,9 @@ void loop() {
 
   if (irLeft == LOW && irRight == LOW) {
     moveForward();
-  } else if (irLeft == LOW && irRight == HIGH) {
-    turnLeft();
   } else if (irLeft == HIGH && irRight == LOW) {
+    turnLeft();
+  } else if (irLeft == LOW && irRight == HIGH) {
     turnRight();
   } else {
     stopMoving();
@@ -39,17 +39,17 @@ void loop() {
 }
 
 void moveForward() {
-  servoLeft.write(0);     // تحرك للأمام
-  servoRight.write(180);
+  servoLeft.write(180);     // تحرك للأمام
+  servoRight.write(0);
 }
 
 void turnLeft() {
   servoLeft.write(90);    // توقف اليسار
-  servoRight.write(180);  // اليمين يتحرك
+  servoRight.write(0);  // اليمين يتحرك
 }
 
 void turnRight() {
-  servoLeft.write(0);     // اليسار يتحرك
+  servoLeft.write(180);     // اليسار يتحرك
   servoRight.write(90);   // توقف اليمين
 }
 
