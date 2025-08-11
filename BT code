@@ -153,3 +153,163 @@ if __name__ == "__main__":
         stop_motors()
         cleanup_ir()
         cleanup_motors()
+#_____v2______________________________________________________________________________________
+
+import time
+import math
+import cv2
+import apriltag
+import py_trees
+
+# ================== IR Sensor & Motors ==================
+from sensors.ir_sensor import setup_ir, read_ir, cleanup_ir
+from motors.motor_driver import setup_motors, move_forward, turn_left, turn_right, stop_motors, cleanup_motors
+
+# ================== Robot State ==================
+robot_state = {
+    "table_number": None,      # Set from Telegram
+    "food_loaded": False,      # Set manually or via sensor
+    "tag_detected": None,      # Filled by AprilTag detection
+    "at_table": False,         # Marked after delivery
+    "at_base": True            # True when robot returns to base
+}
+
+# ================== Camera Setup ==================
+fx, fy = 600, 600
+cx, cy = 320, 240
+tag_size = 0.05
+
+apriltag_options = apriltag.DetectorOptions(families="tag36h11")
+apriltag_detector = apriltag.Detector(apriltag_options)
+
+cap = cv2.VideoCapture(0)
+if not cap.isOpened():
+    print("Error: Camera not accessible")
+    exit()
+
+# ================== Movement Functions ==================
+def line_follow_step():
+    left, right = read_ir()
+    if left == 0 and right == 0:
+        move_forward()
+    elif left == 1 and right == 1:
+        turn_left()
+    elif left == 0 and right == 1:
+        turn_right()
+    else:
+        stop_motors()
+    time.sleep(0.05)
+
+def return_to_base():
+    # هنا ممكن نعمل نفس منطق تتبع الخط بالعكس أو إعادة تموضع
+    while not robot_state["at_base"]:
+        line_follow_step()
+
+# ================== Camera Detection ==================
+def detect_apriltag_from_camera():
+    ret, frame = cap.read()
+    if not ret:
+        return None
+
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    detections = apriltag_detector.detect(gray)
+
+    for detection in detections:
+        pose, e0, e1 = apriltag_detector.detection_pose(
+            detection, (fx, fy, cx, cy), tag_size
+        )
+        tag_id = detection.tag_id
+        return tag_id  # رجع أول ID تم اكتشافه
+
+    return None  # إذا ما لقي شي
+
+# ================== Announce Delivery ==================
+def announce_delivery():
+    print("Order delivered! 🎉")
+    # هنا تقدر تضيف بوق أو رسالة تيليجرام
+
+# ================== Behavior Tree Nodes ==================
+class TableNumberReceived(py_trees.behaviour.Behaviour):
+    def update(self):
+        return py_trees.common.Status.SUCCESS if robot_state["table_number"] is not None else py_trees.common.Status.FAILURE
+
+class FoodIsLoaded(py_trees.behaviour.Behaviour):
+    def update(self):
+        return py_trees.common.Status.SUCCESS if robot_state["food_loaded"] else py_trees.common.Status.RUNNING
+
+class FollowAndDetect(py_trees.behaviour.Behaviour):
+    def update(self):
+        line_follow_step()
+        tag_id = detect_apriltag_from_camera()
+        if tag_id is not None:
+            robot_state["tag_detected"] = tag_id
+            return py_trees.common.Status.SUCCESS
+        return py_trees.common.Status.RUNNING
+
+class TagMatchesTable(py_trees.behaviour.Behaviour):
+    def update(self):
+        if robot_state["tag_detected"] == robot_state["table_number"]:
+            robot_state["at_table"] = True
+            return py_trees.common.Status.SUCCESS
+        return py_trees.common.Status.FAILURE
+
+class AnnounceDelivery(py_trees.behaviour.Behaviour):
+    def update(self):
+        if robot_state["at_table"]:
+            announce_delivery()
+            return py_trees.common.Status.SUCCESS
+        return py_trees.common.Status.FAILURE
+
+class ReturnToStart(py_trees.behaviour.Behaviour):
+    def update(self):
+        return_to_base()
+        robot_state["at_base"] = True
+        return py_trees.common.Status.SUCCESS
+
+class Idle(py_trees.behaviour.Behaviour):
+    def update(self):
+        return py_trees.common.Status.RUNNING
+
+# ================== Build Behavior Tree ==================
+def create_behavior_tree():
+    root = py_trees.composites.Selector(name="Root", memory=False)
+
+    deliver_sequence = py_trees.composites.Sequence(name="DeliverFood", memory=False)
+    deliver_sequence.add_children([
+        TableNumberReceived(),
+        FoodIsLoaded(),
+        FollowAndDetect(),
+        TagMatchesTable(),
+        AnnounceDelivery(),
+        ReturnToStart()
+    ])
+
+    idle = Idle()
+    root.add_children([deliver_sequence, idle])
+    return root
+
+# ================== Main Loop ==================
+if __name__ == "__main__":
+    setup_ir()
+    setup_motors()
+
+    tree = create_behavior_tree()
+    bt = py_trees.trees.BehaviourTree(tree)
+    bt.visitors.append(py_trees.visitors.SnapshotVisitor())
+
+    try:
+        while True:
+            bt.tick()
+            snapshot = bt.visitors[0]
+            print(py_trees.display.unicode_tree(bt.root, visited=snapshot.visited))
+            time.sleep(0.1)
+
+    except KeyboardInterrupt:
+        print("Forced Stop.")
+
+    finally:
+        stop_motors()
+        cleanup_ir()
+        cleanup_motors()
+        cap.release()
+        cv2.destroyAllWindows()
